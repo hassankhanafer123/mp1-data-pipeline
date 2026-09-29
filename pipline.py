@@ -7,6 +7,7 @@ Usage:
     python pipeline.py --input data.csv --output clean.csv
     python pipeline.py --input data.csv --output results.json --format json --verbose
 """
+from data_loaders import load_data
 
 import argparse
 import logging
@@ -62,7 +63,12 @@ def main():
     logger.debug(f"Arguments received: {args}")
     if not validate_input(args.input):
         sys.exit(1)
-    pass  # TODO: implement
+    try:
+        data = load_data(args.input)
+        logger.info(f"Data loaded successfully from {args.input}")
+    except ValueError as e:
+        logger.error(f"Failed to load data from {args.input}: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
