@@ -21,7 +21,7 @@ def setup_logging(verbose=False):
     """Configure logging for the pipeline."""
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
-        level=level
+        level=level,
         datefmt="%H:%M:%S",
         format="%(asctime)s [%(levelname)s] %(message)s")
     pass  # TODO: implement
@@ -46,11 +46,22 @@ def parse_arguments():
 
 def validate_input(filepath):
     """Check whether the input path exists and is a file."""
+    if not Path(filepath).is_file():
+        logger.error(f"Input file not found: {filepath}")
+        return False
+
+    logger.info(f"Input file validated: {filepath}")
+    return True
     pass  # TODO: implement
 
 
 def main():
     """Main pipeline function."""
+    args = parse_arguments()
+    setup_logging(args.verbose)
+    logger.debug(f"Arguments received: {args}")
+    if not validate_input(args.input):
+        sys.exit(1)
     pass  # TODO: implement
 
 
