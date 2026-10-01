@@ -8,6 +8,7 @@ Usage:
     python pipeline.py --input data.csv --output results.json --format json --verbose
 """
 from data_loaders import load_data
+from data_processor import process_data, create_cleaning_report
 
 import argparse
 import logging
@@ -24,7 +25,7 @@ def setup_logging(verbose=False):
     logging.basicConfig(
         level=level,
         datefmt="%H:%M:%S",
-        format="%(asctime)s [%(levelname)s] %(message)s")
+        format="%(asctime)s %(levelname)-8s %(name)s — %(message)s")
     pass  # TODO: implement
 
 
@@ -36,8 +37,8 @@ def parse_arguments():
                         help="Path to the input file")
     parser.add_argument("--output", "-o", required=True,
                         help="Path to the output file")
-    parser.add_argument("--format", choices=["csv", "json"], default="csv",
-                        help="Output format")
+    parser.add_argument("--config", "-c", required=True,
+                        help="Path to YAML configuration file")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Enable verbose logging")
 
@@ -63,12 +64,30 @@ def main():
     logger.debug(f"Arguments received: {args}")
     if not validate_input(args.input):
         sys.exit(1)
+    if not validate_input(args.config):
+        sys.exit(1)
     try:
         data = load_data(args.input)
         logger.info(f"Data loaded successfully from {args.input}")
+        config = load_data(args.config)
+        logger.info(f"Configuration loaded successfully from {args.config}")
     except ValueError as e:
-        logger.error(f"Failed to load data from {args.input}: {e}")
+        logger.error(f"Failed to load files: {e}")
         sys.exit(1)
+    original_data = data.copy()
+    try:
+        cleaned_data = process_data(data, config)
+    except ValueError as e:
+        logger.error(f"Failed to process data: {e}")
+        sys.exit(1)
+
+    report = create_cleaning_report(original_data, cleaned_data)
+    print(f"Processing report: {report}")
+    logger.info(f"Cleaning report: {report}")
+
+    cleaned_data.to_csv(args.output, index=False)
+    logger.info(f"Cleaned data saved to {args.output}")
+    
 
 
 if __name__ == "__main__":

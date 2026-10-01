@@ -6,7 +6,8 @@ logger = logging.getLogger(__name__)
 def remove_duplicates(df):
     """Remove duplicate rows."""
     df_nodup = df.drop_duplicates()
-    logger.debug("before removing duplicates: %d rows, after: %d rows", len(df), len(df_nodup))
+    logger.debug("before removing duplicates: %d rows, after: %d rows, removed: %d rows",
+                 len(df), len(df_nodup), len(df) - len(df_nodup))
     return df_nodup
 
 
@@ -14,11 +15,14 @@ def handle_missing(df, axis="rows"):
     """Drop rows or columns containing missing values."""
     if axis == "rows":
         df_clean = df.dropna(axis=0)
-        logger.debug("before handling missing values: %d rows, after: %d rows", len(df), len(df) - len(df_clean))
+        logger.debug("before handling missing values: %d rows, after: %d rows, removed: %d rows",
+                     len(df), len(df_clean), len(df) - len(df_clean))
     elif axis == "columns":
         df_clean = df.dropna(axis=1)
-        logger.debug("before handling missing values: %d columns, after: %d columns", df.shape[1],"total removed: %d", df.shape[1]- df_clean.shape[1])
+        logger.debug("before handling missing values: %d columns, after: %d columns, removed: %d columns",
+                     df.shape[1], df_clean.shape[1], df.shape[1] - df_clean.shape[1])
     else:
+        logger.error("Unsupported axis: %s", axis)
         raise ValueError(f"Unsupported axis: {axis}")
 
     return df_clean
@@ -49,27 +53,35 @@ def remove_outliers(df, columns, method, threshold):
             IQR = Q3 - Q1
             df = df[(df[col] >= Q1 - threshold * IQR) & (df[col] <= Q3 + threshold * IQR)]
         rows_after = len(df)
-        logger.debug("Column '%s': before removing outliers: %d rows, after: %d rows", col, rows_before, rows_after)
+        logger.debug("Column '%s' (method=%s, threshold=%s): removed %d rows",
+                     col, method, threshold, rows_before - rows_after)
     return df
 
 
 def process_data(df, config):
     """Apply the processing steps enabled in the configuration."""
-    df_processed = df.copy()
-    if config.get("remove_duplicates", False):
-        df_processed = remove_duplicates(df_processed)
-    if config.get("handle_missing", False):
-        axis = config.get("handle_missing_axis", "rows")
-        df_processed = handle_missing(df_processed, axis=axis)
-    if config.get("remove_outliers", False):
-        columns = config.get("outlier_columns", [])
-        method = config.get("outlier_method", "zscore")
-        threshold = config.get("outlier_threshold", 3)
-        df_processed = remove_outliers(df_processed, columns, method, threshold)
-    return df_processed
-    pass
+    processing = config["processing"]
+    if processing["remove_duplicates"]:
+        df = remove_duplicates(df)
+    missing = processing["missing"]
+    if missing["enabled"]:
+        df = handle_missing(df, axis=missing["axis"])
+    outliers = processing["outliers"]
+    if outliers["enabled"]:
+        df = remove_outliers(df,
+                             outliers["columns"],
+                             outliers["method"],
+                             outliers["threshold"])
 
+    return df
 
 def create_cleaning_report(df_before, df_after):
     """Return a dictionary summarizing the cleaning results."""
-    pass
+    return {
+        "rows_before":     len(df_before),
+        "rows_after":      len(df_after),
+        "rows_removed":    len(df_before) - len(df_after),
+        "columns_before":  df_before.shape[1],
+        "columns_after":   df_after.shape[1],
+        "columns_removed": df_before.shape[1] - df_after.shape[1],
+    }
