@@ -7,8 +7,15 @@ Usage:
     python pipeline.py --input data.csv --output clean.csv
     python pipeline.py --input data.csv --output results.json --format json --verbose
 """
-from data_loaders import load_data
-from data_processor import process_data, create_cleaning_report
+from src import (
+    create_cleaning_report,
+    load_data,
+    process_data,
+    save_data,
+    setup_logging,
+    validate_dataframe,
+    validate_input,
+)
 
 import argparse
 import logging
@@ -17,16 +24,6 @@ from pathlib import Path
 
 
 logger = logging.getLogger(__name__)
-
-## Verbosity = how much information is printed to the console. The higher the level, the more information is printed.
-def setup_logging(verbose=False):
-    """Configure logging for the pipeline."""
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        datefmt="%H:%M:%S",
-        format="%(asctime)s %(levelname)-8s %(name)s — %(message)s")
-    pass  # TODO: implement
 
 
 def parse_arguments():
@@ -46,15 +43,6 @@ def parse_arguments():
     pass  # TODO: implement
 
 
-def validate_input(filepath):
-    """Check whether the input path exists and is a file."""
-    if not Path(filepath).is_file():
-        logger.error(f"Input file not found: {filepath}")
-        return False
-
-    logger.info(f"Input file validated: {filepath}")
-    return True
-    pass  # TODO: implement
 
 
 def main():
@@ -74,6 +62,15 @@ def main():
     except ValueError as e:
         logger.error(f"Failed to load files: {e}")
         sys.exit(1)
+    required_columns = config["validation"]["required_columns"]
+    numeric_columns = config["validation"]["numeric_columns"]
+    rows_before_validation = len(data)
+    try:
+        data = validate_dataframe(data, required_columns, numeric_columns)
+    except ValueError as e:
+        logger.error(f"Validation failed: {e}")
+        sys.exit(1)
+    logger.info(f"Validation complete: {rows_before_validation} -> {len(data)} rows")
     original_data = data.copy()
     try:
         cleaned_data = process_data(data, config)
@@ -82,11 +79,11 @@ def main():
         sys.exit(1)
 
     report = create_cleaning_report(original_data, cleaned_data)
-    print(f"Processing report: {report}")
     logger.info(f"Cleaning report: {report}")
 
-    cleaned_data.to_csv(args.output, index=False)
-    logger.info(f"Cleaned data saved to {args.output}")
+    output_path = save_data(cleaned_data, args.output)
+    logger.info(f"Saved cleaned data to {output_path}")
+    print(f"Processing report: {report}")
     
 
 
